@@ -1,9 +1,36 @@
-// src/components/minuman/RecipeGrid.jsx
-import { Clock, Star, Coffee, ChefHat } from 'lucide-react';
+import { Clock, Star, Coffee, ChefHat, Share2 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import FavoriteButton from '../common/FavoriteButton';
 
 export default function RecipeGrid({ recipes, onRecipeClick }) {
+  const handleShare = async (recipe, e) => {
+    e.stopPropagation();
+
+    const shareUrl = `http://mod5-one.vercel.app/recipe/${recipe.id}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: recipe.name,
+          text: `Lihat resep ${recipe.name} di Resep Nusantara`,
+          url: shareUrl,
+        });
+      } catch (error) {
+        console.log('Error sharing:', error);
+        copyToClipboard(shareUrl);
+      }
+    } else {
+      copyToClipboard(shareUrl);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Link resep berhasil disalin ke clipboard!');
+    }).catch(() => {
+      alert('Gagal menyalin link. URL: ' + text);
+    });
+  };
   const [visibleCards, setVisibleCards] = useState(new Set());
   const cardRefs = useRef([]);
 
@@ -52,27 +79,33 @@ export default function RecipeGrid({ recipes, onRecipeClick }) {
                 : 'translate-y-8 opacity-0'
             }`}
           >
-            {/* Card structure is consistent, only the tag is changed */}
             <div 
               onClick={() => onRecipeClick && onRecipeClick(recipe.id)}
               className="relative bg-white/15 backdrop-blur-xl border border-white/25 rounded-2xl md:rounded-3xl overflow-hidden shadow-lg md:shadow-2xl shadow-green-500/5 hover:shadow-green-500/15 transition-all duration-500 cursor-pointer group-hover:scale-105 group-hover:bg-white/20">
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative h-32 md:h-56 overflow-hidden">
-                <img 
+                <img
                   src={recipe.image_url}
                   alt={recipe.name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
                 
-                {/* Favorite Button */}
-                <div className="absolute top-3 right-3 z-10">
+                <div className="absolute top-3 right-3 z-10 flex gap-2">
+                  <button
+                    onClick={(e) => handleShare(recipe, e)}
+                    className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-green-600 flex items-center justify-center transition-colors"
+                    title="Bagikan resep"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
                   <FavoriteButton recipeId={recipe.id} size="sm" />
                 </div>
               </div>
               <div className="relative z-10 p-4 md:p-8">
                 <div className="flex items-center justify-between mb-3 md:mb-4">
-                  {/* Changed tag color from blue to green */}
                   <span className="text-xs font-semibold text-green-700 bg-green-100/90 px-2 md:px-3 py-1 md:py-1.5 rounded-full">
                     Minuman
                   </span>
