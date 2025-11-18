@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import recipeService from '../services/recipeService';
 
+const cache = new Map();
+const CACHE_TTL = 10 * 60 * 1000;
+
 /**
- * Custom hook for fetching recipes
- * @param {Object} params - Query parameters
- * @returns {Object} - { recipes, loading, error, pagination, refetch }
+ * @param {Object} params 
+ * @returns {Object} 
  */
 export function useRecipes(params = {}) {
   const [recipes, setRecipes] = useState([]);
@@ -12,28 +14,67 @@ export function useRecipes(params = {}) {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState(null);
 
-  const fetchRecipes = useCallback(async () => {
+  const currentParamsRef = useRef();
+
+  const fetchRecipes = useCallback(async (forceRefresh = false) => {
+    const cacheKey = JSON.stringify(params);
+
+    if (!forceRefresh && cache.has(cacheKey)) {
+      const cached = cache.get(cacheKey);
+      const now = Date.now();
+
+      if (now - cached.timestamp < CACHE_TTL) {
+        setRecipes(cached.data || []);
+        setPagination(cached.pagination || null);
+        setLoading(false);
+        setError(null);
+        return;
+      } else {
+        cache.delete(cacheKey);
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
       const response = await recipeService.getRecipes(params);
-      
+
       if (response.success) {
-        setRecipes(response.data || []);
-        setPagination(response.pagination || null);
+        const data = response.data || [];
+        const paginationData = response.pagination || null;
+
+        cache.set(cacheKey, {
+          data,
+          pagination: paginationData,
+          timestamp: Date.now()
+        });
+
+        setRecipes(data);
+        setPagination(paginationData);
       } else {
         setError(response.message || 'Failed to fetch recipes');
+        setRecipes([]);
+        setPagination(null);
       }
     } catch (err) {
       setError(err.message || 'An error occurred while fetching recipes');
       setRecipes([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
   }, [JSON.stringify(params)]);
 
   useEffect(() => {
-    fetchRecipes();
+    const newParams = JSON.stringify(params);
+    if (currentParamsRef.current !== newParams) {
+      currentParamsRef.current = newParams;
+      fetchRecipes();
+    }
+  }, [fetchRecipes]);
+
+  const refetch = useCallback(() => {
+    fetchRecipes(true);
   }, [fetchRecipes]);
 
   return {
@@ -41,14 +82,13 @@ export function useRecipes(params = {}) {
     loading,
     error,
     pagination,
-    refetch: fetchRecipes,
+    refetch,
   };
 }
 
 /**
- * Custom hook for fetching a single recipe
- * @param {string} id - Recipe ID
- * @returns {Object} - { recipe, loading, error, refetch }
+ * @param {string} id 
+ * @returns {Object} 
  */
 export function useRecipe(id) {
   const [recipe, setRecipe] = useState(null);
@@ -65,7 +105,7 @@ export function useRecipe(id) {
       setLoading(true);
       setError(null);
       const response = await recipeService.getRecipeById(id);
-      
+
       if (response.success) {
         setRecipe(response.data);
       } else {
